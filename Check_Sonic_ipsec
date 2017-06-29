@@ -1,0 +1,75 @@
+#! /bin/sh
+#
+# Script to check VPN status on sonicwall
+# This is just a wrapper for the check_sonicwall script
+# It's grab required data from librenms with just the hostname
+# as input
+
+
+# Usage:
+
+
+OPTIND=1         # Reset in case getopts has been used previously in the shell.
+
+while getopts "h?H:" opt; do
+    case "$opt" in
+    h|\?)
+        echo "   Check sonicwall VPN"
+        echo "           -H <hostname>"
+        echo "          uses notes field in librenms, list the expected active VPNs here in the format"
+        echo "                  VPN|<tunnel-name>"
+        echo "          tunnel names shouldn't have spaces"
+        exit 0
+        ;;
+    H)
+        host=$OPTARG
+        ;;
+    esac
+done
+
+shift $((OPTIND-1))
+
+[ "$1" = "--" ] && shift
+
+# Variables:
+CONFIG=/opt/librenms/config.php
+CHECK=/usr/lib/nagios/plugins/sonicwall_check_vpn
+
+
+DB_USER=$(fgrep db_user $CONFIG | awk -F\' '{print $4}')
+DB_PASS=$(fgrep db_pass $CONFIG | awk -F\' '{print $4}')
+DB_NAME=$(fgrep db_name $CONFIG | awk -F\' '{print $4}')
+
+
+# Query Database:
+
+vpnlist=$(mysql -u $DB_USER -p$DB_PASS -D $DB_NAME -NBHe "select notes from devices where hostname='$host';" | grep "VPN\|" | cut -d'|' -f2 | cut -d '<' -f 1)
+snmp=$(mysql -u $DB_USER -p$DB_PASS -D $DB_NAME -NBe "select community from devices where hostname='$host';")
+
+if [ -z "$vpnlist" ];then
+        printf "No VPNlist found. Have you populated the notes with VPN|<hostname> entries \n"
+        exit 3
+        else
+                if [ -z "$snmp" ];then
+                printf "No SNMP community"
+                exit 3
+                else
+
+                for tunnel in $vpnlist; do
+
+                    installed=$(/usr/lib/nagios/plugins/sonicwall_check_vpn -H $host -C $snmp -V $tunnel| egrep -c alive)
+                         if [ $installed = 1 ]; then
+                                # everythings cool
+                                printf "Peer: $tunnel Established. \n"
+                          else
+                                # everythings not cool
+                                printf "Peer: $tunnel Critical. \n"
+                                exit=2
+                          fi
+                done
+                fi
+fi
+
+
+# Lets dump some statuses and getout of here
+exit $exit
