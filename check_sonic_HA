@@ -1,0 +1,63 @@
+#!/usr/bin/python
+from netmiko import ConnectHandler
+import re, sys, getopt
+
+hostname = 'NULL'
+
+try:
+    options, remainder = getopt.getopt(
+        sys.argv[1:],
+        'h:H:',
+        ['help',
+         'hostname=',
+         ])
+except getopt.GetoptError as err:
+    print('ERROR:', err)
+    sys.exit(1)
+
+for opt, arg in options:
+    if opt in ('-h',):
+        print ('usage -h <hostname>')
+        sys.exit(3)
+    elif opt in ('-H'):
+        hostname = arg
+
+# Connect to device
+ssh_connect = ConnectHandler(
+        device_type='generic_termserver',
+        ip=hostname,
+        username= '<username>',
+        password = '<password>'
+        )
+
+alarm ='UNKNOWN'
+exitcode = 3
+
+# grab status data
+output = ssh_connect.send_command('show high-availability status')
+parseme = output.split('\n')
+
+for line in parseme:
+    if 'Primary State:' in line:
+        pstatus = line.split (' ')
+        pstate = str(pstatus[19])
+
+    if 'Secondary State:' in line:
+        sstatus = line.split (' ')
+        sstate = str(sstatus[17])
+
+if 'ACTIVE' in pstate:
+        alarm = 'OK'
+        exitcode = 0
+
+if 'ACTIVE' in sstate:
+        alarm = 'Warning'
+        exitcode = 1
+
+
+if alarm is 'UNKNOWN':
+        print (alarm,pstate,sstate)
+        sys.exit(3)
+
+print alarm,"- Primary status: ",pstate,"    Secondary status: ",sstate
+sys.exit(exitcode)
