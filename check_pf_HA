@@ -1,0 +1,66 @@
+#!/usr/bin/python
+# CE 2017
+# nasstar
+# Script to return CARP status for librenms service check, requires local user with SSH rights on PFsense.
+
+
+from netmiko import ConnectHandler
+import re, sys, getopt
+
+hostname = 'NULL'
+
+try:
+    options, remainder = getopt.getopt(
+        sys.argv[1:],
+        'h:H:',
+        ['help',
+         'hostname=',
+         ])
+except getopt.GetoptError as err:
+    print('ERROR:', err)
+    sys.exit(1)
+
+for opt, arg in options:
+    if opt in ('-h',):
+        print ('usage -h <hostname>')
+        sys.exit(3)
+    elif opt in ('-H'):
+        hostname = arg
+
+# login file should be in format <username>:<password>
+with open('/usr/lib/nagios/plugins/login') as f:
+  credentials = [x.strip().split(':') for x in f.readlines()]
+
+for user,passwd in credentials:
+
+# Connect to device
+  ssh_connect = ConnectHandler(
+        device_type = 'generic_termserver',
+        ip = hostname,
+        username = user,
+        password = passwd
+        )
+alarm ='OK - I am what I should be'
+exitcode = 0
+
+# grab status data
+output = ssh_connect.send_command('ifconfig | grep carp:')
+if output == '':
+        print 'WARNING - Carp may be disabled'
+        sys.exit(1)
+parseme = output.split('\n')
+
+for line in parseme:
+        carpstatus = line.split (' ')
+        carp = str(carpstatus[1])
+        skew = str(carpstatus[7])
+        if 'BACKUP' in carp:
+         if  skew == '0':
+          alarm = 'WARNING - I am not master of my domain'
+          exitcode = 2
+        elif 'MASTER' in carp:
+         if skew != '0':
+          alarm = 'WARNING - I appear to be master and thats bad'
+          exitcode = 2
+print alarm
+sys.exit(exitcode)
