@@ -3,14 +3,9 @@
 /*
 * LibreNMS
 *
-* Copyright (c) 2015 Søren Friis Rosiak <sorenrosiak@gmail.com>
-* This program is free software: you can redistribute it and/or modify it
-* under the terms of the GNU General Public License as published by the
-* Free Software Foundation, either version 3 of the License, or (at your
-* option) any later version.  Please see LICENSE.txt at the top level of
-* the source code distribution for details.
-*
-* Modified by chris E to fix librenms access to smokeping
+* when using smokeping generation script to group by device group
+* this will generate symlinks from the general "type" folders that 
+* librenms will group devices
 */
 
 $init_modules = array();
